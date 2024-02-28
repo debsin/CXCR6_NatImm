@@ -1,0 +1,263 @@
+library(Seurat)
+library(UCell)
+library(ggplot2)
+library(ggpubr)
+library(dittoSeq)
+
+gene.path = "C:/Projects/external/jem_20190249_tables1/"
+
+lungTRM_noTRM = readxl::read_xlsx(file.path(gene.path,"JEM_20190249_TableS2.xlsx"),skip = 2,col_names = T)
+lungTRM_noTRM.genes = lungTRM_noTRM$`Gene ID`[lungTRM_noTRM$`log2 fold change`>2 & lungTRM_noTRM$`P adj`<0.01]
+# lungTRM_noTRM.genes = setdiff(lungTRM_noTRM.genes, "CXCR6")
+
+
+cov = readRDS("nCoV.rds")
+anno = read.csv("covid_nat_med/all.cell.annotation.meta.txt", sep = "\t", header = T)
+
+cov = subset(cov, cells = match(anno$ID, cov$ID))
+cov$anno = anno$celltype
+table(cov$sample, cov$disease)
+# moderate covid patients (=infection) and severe COVID patients (=sepsis)
+# Can you compare the CXCR6 signature in the T cell compartment between these 2 groups ? 
+# and of CXCR6 TRM signature ? 
+# Ideally, we want to show that sepsis patients have higher CXCR6 expression in T cells (TRM cells) than infection patients .
+# and if you can look at CXCL16, Ccl2, Ccl7 and ccl12 in the macrophage compartment ++
+table(cov$seurat_clusters)
+
+DimPlot(cov, group.by = "anno", label = T, label.box = T)
+table(cov$cluster, cov$anno)
+
+t.anno = read.csv("covid_nat_med/NKT.cell.annotation.meta.txt", sep = "\t", header = T)
+
+cov$anno.T_l2 = "non"
+cov$anno.T_l2[t.anno$ID] = t.anno$celltype
+
+table(cov$sample, cov$group)
+
+# keep only clean T cells
+cov.T = subset(cov, cells = grep("T", cov$anno.T_l2))
+
+DimPlot(cov.T, group.by = "anno.T_l2", label = T, label.box = T)
+
+DimPlot(cov.T, group.by = "sample", label = T, label.box = T)
+
+cov.T$condition = cov.T$group
+cov.T$condition = gsub("HC", "Healthy", cov.T$condition)
+cov.T$condition = gsub("^O", "Moderate", cov.T$condition)
+cov.T$condition = gsub("S/C", "Severe", cov.T$condition)
+table(cov.T$anno.T_l2)
+
+saveRDS(cov.T, "covid_nat_med/T_all.rds")
+
+##############T###############
+DefaultAssay(cov.T) <- "RNA"
+SubseNKTs.list <- SplitObject(cov.T, split.by = "sample")
+for (i in 1:length(SubseNKTs.list)) {
+  SubseNKTs.list[[i]] <- NormalizeData(SubseNKTs.list[[i]], verbose = FALSE)
+  SubseNKTs.list[[i]] <- FindVariableFeatures(SubseNKTs.list[[i]], selection.method = "vst", nfeatures = 2000,verbose = FALSE)
+  SubseNKTs.list[[i]]@assays$RNA@var.features = union(SubseNKTs.list[[i]]@assays$RNA@var.features, lungTRM_noTRM.genes)
+}
+
+table(cov.T$sample, cov.T$anno.T_l2)
+samples_name = c('C51','C100','GSM3660650','C141','C142','C144','C143','C145','C148','C149','C152')
+reference.list <- SubseNKTs.list[samples_name]
+NKT.temp <- FindIntegrationAnchors(object.list = reference.list, dims = 1:50,k.filter = 140)
+NKT.Integrated_clean <- IntegrateData(anchorset = NKT.temp, dims = 1:50)
+
+###first generate data and scaledata in RNA assay
+DefaultAssay(NKT.Integrated_clean) <- "RNA"
+NKT.Integrated_clean[['percent.mito']] <- PercentageFeatureSet(NKT.Integrated_clean, pattern = "^MT-")
+NKT.Integrated_clean <- NormalizeData(object = NKT.Integrated_clean, normalization.method = "LogNormalize", scale.factor = 1e4)
+NKT.Integrated_clean <- FindVariableFeatures(object = NKT.Integrated_clean, selection.method = "vst", nfeatures = 2000,verbose = FALSE)
+NKT.Integrated_clean@assays$RNA@var.features = union(NKT.Integrated_clean@assays$RNA@var.features, lungTRM_noTRM.genes)
+
+NKT.Integrated_clean <- ScaleData(NKT.Integrated_clean, verbose = FALSE, vars.to.regress = c("nCount_RNA", "percent.mito"))
+
+##change to integrated assay
+DefaultAssay(NKT.Integrated_clean) <- "integrated"
+VlnPlot(object = NKT.Integrated_clean, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+FeatureScatter(object = NKT.Integrated_clean, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+
+NKT.Integrated_clean = subset(NKT.Integrated_clean, cells = grep("T", NKT.Integrated_clean$anno.T_l2))
+# Run the standard workflow for visualization and clustering
+NKT.Integrated_clean <- ScaleData(NKT.Integrated_clean, verbose = FALSE, vars.to.regress = c("nCount_RNA", "percent.mito"))
+# NKT.Integrated_clean <- ScaleData(NKT.Integrated_clean, verbose = FALSE)
+NKT.Integrated_clean <- RunPCA(NKT.Integrated_clean, verbose = FALSE)
+#visulaization pca result
+NKT.Integrated_clean <- ProjectDim(object = NKT.Integrated_clean)
+ElbowPlot(object = NKT.Integrated_clean,ndims = 50)
+
+NKT.Integrated_clean <- RunUMAP(NKT.Integrated_clean, reduction = "pca", dims = 1:50, seed.use = 100, n.neighbors = 20)
+
+pdf("covid_nat_med/t_cell_integrated_umap.pdf", width = 12, height = 5)
+DimPlot(NKT.Integrated_clean, group.by = "anno.T_l2", label = T, label.box = T)+
+  DimPlot(NKT.Integrated_clean, group.by = "sample", label = T, label.box = T)
+dev.off()
+
+DefaultAssay(NKT.Integrated_clean) = "integrated"
+saveRDS(NKT.Integrated_clean, "covid_nat_med/T_integrated.rds")
+
+
+## Here are the plots
+
+cov.T = AddModuleScore(cov.T, assay = "integrated",ctrl = 50,
+                                      features = list("TRM" = lungTRM_noTRM.genes), name = "TRM_")
+
+cov.T = AddModuleScore(cov.T, assay = "integrated",ctrl = 50,
+                                      features = list("CXCR6" = c("CXCR6")), name = "CXCR6_")
+
+
+DimPlot(NKT.Integrated_clean, group.by = "anno.T_l2", label = T, label.box = T)
+
+# plot(density(NKT.Integrated_clean$TRM_1), main = "TRM Signature")
+hist(NKT.Integrated_clean$TRM_1,breaks = 100, main = "TRM Signature", xlab = "signature score")
+abline(v = quantile(NKT.Integrated_clean$TRM_1, 0.5), col = "red", lwd = 2)
+text(0.005, 215, "median")
+
+# plot(density(NKT.Integrated_clean$CXCR6_1), main = "CXCR6 Signature")
+hist(NKT.Integrated_clean$CXCR6_1,breaks = 100, main = "CXCR6 Signature",  xlab = "signature score")
+abline(v = quantile(NKT.Integrated_clean$CXCR6_1, 0.6), col = "red", lwd = 2)
+text(0.6, 200, "quantile @ 0.6")
+
+FeaturePlot(NKT.Integrated_clean, features = "TRM_1", slot = "data",
+            min.cutoff = quantile(NKT.Integrated_clean$TRM_1, 0.5), order = T, ncol = 3)+ggtitle("TRM Signature")+
+  FeaturePlot(NKT.Integrated_clean, features = "CXCR6_1", 
+              min.cutoff = quantile(NKT.Integrated_clean$CXCR6_1, 0.6), order = T)+ggtitle("CXCR6 Signature")
+
+# cxcr6_pos = which(NKT.Integrated_clean[["integrated"]]@data["CXCR6", ]>0)
+cxcr6_pos = which(NKT.Integrated_clean$CXCR6_1>quantile(NKT.Integrated_clean$CXCR6_1, 0.6))
+
+pdf("covid_nat_med/t_cells_trm_CXCR6.pdf", width = 15, height = 4.5)
+FeatureScatter(object = NKT.Integrated_clean, slot = "data",
+               cells = intersect(cxcr6_pos, grep("Healthy", NKT.Integrated_clean$condition, invert = F)),
+               feature1 = "TRM_1", feature2 = "CXCR6", group.by = "condition", shuffle = T)+
+  xlab("TRM Signature Score")+ylab("CXCR6")+
+  FeatureScatter(object = NKT.Integrated_clean, slot = "data",
+                 cells = intersect(cxcr6_pos, grep("Healthy", NKT.Integrated_clean$condition, invert = T)), 
+                 feature1 = "TRM_1", feature2 = "CXCR6", group.by = "condition", shuffle = T)+
+  xlab("TRM Signature Score")+ylab("CXCR6")+
+  FeatureScatter(object = NKT.Integrated_clean,  slot = "data",
+                 cells = cxcr6_pos, 
+                 feature1 = "TRM_1", feature2 = "CXCR6", group.by = "condition", shuffle = T)+
+  xlab("TRM Signature Score")+ylab("CXCR6")
+dev.off()
+
+
+my_comparisons = list(c("Healthy","Moderate"),c("Healthy","Severe"),c("Moderate","Severe"))
+
+
+dittoPlot(cov.T, var = "CXCR6", assay = "RNA" ,slot = "data", 
+          cells.use = which(cov.T[["RNA"]]@data["CXCR6", ]>0.8),
+          jitter.width = 0.3,jitter.color = "#00000077",jitter.size = 0.1,
+          group.by = "group", plots = c("jitter", "vlnplot", "boxplot"))+
+  ggtitle("T cells", subtitle = "All cell type uncorrected")+
+  stat_compare_means(label = "p.signif", tip.length = 0.03,
+                     comparisons = my_comparisons)+NoLegend()+
+  
+dittoPlot(cov.T, var = "CXCR6", assay = "integrated" ,slot = "data", 
+          cells.use = which(cov.T[["integrated"]]@data["CXCR6", ]>0.8),
+          jitter.width = 0.3,jitter.color = "#00000077",jitter.size = 0.1,
+          group.by = "group", plots = c("jitter", "vlnplot", "boxplot"))+
+  ggtitle("T cells", subtitle = "All cell type integration")+
+  stat_compare_means(label = "p.signif", tip.length = 0.03,
+                     comparisons = my_comparisons)+NoLegend()
+
+plot.df = data.frame(cbind(condition = NKT.Integrated_clean$condition, CXCR6= NKT.Integrated_clean[["integrated"]]@data["CXCR6",]))
+
+head(plot.df)
+dittoPlot(NKT.Integrated_clean, var = "CXCR6", assay = "integrated" ,slot = "data", 
+          cells.use = c(which(NKT.Integrated_clean[["integrated"]]@data["CXCR6", NKT.Integrated_clean$condition =="Healthy"]>1),
+                            which(NKT.Integrated_clean[["integrated"]]@data["CXCR6", NKT.Integrated_clean$condition =="Moderate"]>1),
+                        which(NKT.Integrated_clean[["integrated"]]@data["CXCR6", NKT.Integrated_clean$condition =="Severe"]>0.8)),
+          jitter.width = 0.3,jitter.color = "#00000077",jitter.size = 0.1,
+          group.by = "condition", plots = c("jitter", "vlnplot", "boxplot"))+
+  ggtitle("T cells", subtitle = "T cell type integration")+
+  stat_compare_means(label = "p.signif", tip.length = 0.03,
+                     comparisons = my_comparisons)+NoLegend()
+
+
+dittoPlot(NKT.Integrated_clean, var = "CXCR6", assay = "integrated" ,slot = "data", max = 5,
+          cells.use = intersect(which(NKT.Integrated_clean$CXCR6_1 > quantile(NKT.Integrated_clean$CXCR6_1 ,0.75)),
+                                which(NKT.Integrated_clean$TRM_1 > quantile(NKT.Integrated_clean$TRM_1 ,0.5))),
+          jitter.width = 0.3,jitter.color = "#00000077", jitter.size = 0.1,
+          group.by = "condition", plots = c("jitter", "vlnplot", "boxplot"))+
+  ggtitle("CXCR6 TRM cells")+
+  stat_compare_means(label = "p.signif", tip.length = 0.03, comparisons = my_comparisons)
+
+dittoPlot(NKT.Integrated_clean, var = "CXCR6", assay = "integrated" ,split.ncol = 5,slot = "data",
+          cells.use = intersect(which(NKT.Integrated_clean$CXCR6_1 > quantile(NKT.Integrated_clean$CXCR6_1 ,0.75)),
+                                which(NKT.Integrated_clean$TRM_1 > quantile(NKT.Integrated_clean$TRM_1 ,0.5) )),
+          jitter.width = 0.3,jitter.color = "#00000077",boxplot.width = 0.8,
+          group.by = "group", jitter.size = 0.1,plots = c("boxplot", "jitter"))+
+  ggtitle("CXCR6 TRM cells")+
+  stat_compare_means(label = "p.signif", tip.length = 0.03, comparisons = my_comparisons)
+
+
+
+
+
+
+
+
+
+
+# t1 = dittoPlot(NKT.Integrated_clean, var = "TRM1", assay = "integrated" ,split.ncol = 5,
+#                cells.use = grep("Doublets|NK|Uncertain", NKT.Integrated_clean$anno.T_l2, invert = T),
+#                group.by = "group", split.by ="anno.T_l2", jitter.size = 0.1)+
+#   geom_boxplot(fill = "white", width = 0.3, outlier.shape = NA)+scale_fill_brewer(palette = "Set1")
+
+t1 = dittoPlot(NKT.Integrated_clean, var = "TRM_UCell", assay = "integrated" ,split.ncol = 5,
+               cells.use = grep("Doublets|NK|Uncertain", NKT.Integrated_clean$anno.T_l2, invert = T),
+               group.by = "group", split.by ="anno.T_l2", jitter.size = 0.1)+
+  geom_boxplot(fill = "white", width = 0.3, outlier.shape = NA)+scale_fill_brewer(palette = "Set1")
+
+t2 = dittoPlot(NKT.Integrated_clean, var = "CXCR6_UCell", assay = "integrated" ,split.ncol = 5,
+               cells.use = grep("Doublets|NK|Uncertain", NKT.Integrated_clean$anno.T_l2, invert = T),
+               group.by = "group", split.by ="anno.T_l2", jitter.size = 0.1)+
+  geom_boxplot(fill = "white", width = 0.3, outlier.shape = NA)+scale_fill_brewer(palette = "Set1")
+
+
+t3 = dittoPlot(NKT.Integrated_clean, var = "CXCR6", assay = "integrated" ,split.ncol = 5,
+               cells.use = grep("Doublets|NK|Uncertain", NKT.Integrated_clean$anno.T_l2, invert = T),
+               group.by = "group", split.by ="anno.T_l2", jitter.size = 0.1)+
+  geom_boxplot(fill = "white", width = 0.3, outlier.shape = NA)+scale_fill_brewer(palette = "Set1")
+
+gridExtra::grid.arrange(t1,t2, t3, ncol = 1)
+
+
+DimPlot(NKT.Integrated_clean, group.by = "anno.T_l2", order = T, pt.size = 0.5, label.box = T, label = T)
+FeaturePlot(NKT.Integrated_clean, features = "CXCR6" ,
+            min.cutoff = quantile(NKT.Integrated_clean$CXCR6_UCell, 0.75), pt.size = 0.6, order = T)
+FeaturePlot(NKT.Integrated_clean, features = "TRM_UCell" ,
+            min.cutoff = quantile(NKT.Integrated_clean$TRM_UCell, 0.75), pt.size = 0.6, order = T)
+
+dittoPlot(NKT.Integrated_clean, var = "CXCR6", assay = "integrated" ,split.ncol = 5,
+          cells.use = grep("Doublets|NK", NKT.Integrated_clean$anno.T_l2, invert = T),
+          group.by = "group", split.by ="anno.T_l2", jitter.size = 0.1)+
+  geom_boxplot(fill = "white", width = 0.3, outlier.shape = NA)+scale_fill_brewer(palette = "Set1")
+
+th = round(quantile(NKT.Integrated_clean$TRM_UCell, 0.75), 1)
+plot(density(NKT.Integrated_clean$TRM_UCell), main = "TRM signature")
+abline(v =th, col="red", lwd=3)
+FeaturePlot(NKT.Integrated_clean, features = "TRM_UCell" ,min.cutoff = th, pt.size = 0.8, order = T)+ggtitle("TRM rich T Cells")
+Trm_rich = subset(NKT.Integrated_clean, 
+                  cells = which(NKT.Integrated_clean$TRM_UCell > quantile(NKT.Integrated_clean$TRM_UCell, 0.75)))
+
+th_cxcr6 = round(quantile(NKT.Integrated_clean$CXCR6_UCell, 0.75), 1)
+dittoPlot(Trm_rich, var = "CXCR6_1", assay = "integrated" ,split.ncol = 5,slot = "data",
+          cells.use = which(Trm_rich@assays$integrated@counts["CXCR6",] > 0 ),
+          group.by = "group", jitter.size = 0.1,plots = c("vlnplot", "jitter","boxplot"))+
+  ggtitle("TRM Rich cells")+
+  stat_compare_means(label = "p.signif")
+
+
+dittoPlot(NKT.Integrated_clean, var = "CXCR6", assay = "integrated" ,split.ncol = 5,slot = "data",
+          cells.use = which(NKT.Integrated_clean@assays$integrated@counts["CXCR6",] > 0 ),
+          group.by = "group", jitter.size = 0.1,plots = c("vlnplot", "jitter","boxplot"))+
+  ggtitle("T cells")+
+  stat_compare_means(label = "p.signif")
+# geom_boxplot(fill = "white", width = 0.3, outlier.shape = NA)+scale_fill_brewer(palette = "Set1")
+
+
+##
+
