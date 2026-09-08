@@ -13,7 +13,7 @@ DOI: [10.1038/s41590-024-01819-8](https://doi.org/10.1038/s41590-024-01819-8)
 
 The analyses here principally correspond to **Figure 8** and **Extended Data Figure 10** in the published article. They focus on human validation, cross-species projection, public-dataset integration, cancer-cohort analysis and survival relevance.
 
-This repository is **complementary** to the study's official scRNA-seq and TCR-seq code archive maintained by Victor Gourain. It does not represent the complete analytical workflow of the collaborative study.
+This repository complements the study's separately archived mouse scRNA-seq and TCR-seq workflow and does not represent the complete analytical workflow of the collaborative study.
 
 ## Curated analysis layout
 
@@ -43,14 +43,14 @@ The computational work represented here includes:
 - TCGA cancer analyses linking TRM, macrophage and chemokine signatures;
 - CXCR6–CCR2 coexpression analysis and survival stratification across cancer cohorts.
 
-## Relationship to the official code archive
+## Related official code archive
 
-The paper's code-availability statement points to the official scRNA-seq/TCR-seq workflow deposited by Victor Gourain:
+The paper's code-availability statement also points to the separately archived scRNA-seq/TCR-seq workflow:
 
 - GitLab: https://gitlab.univ-nantes.fr/gourain-v-1/cxcr6_lungsepsis
 - Zenodo: https://doi.org/10.5281/zenodo.10715057
 
-That archive primarily covers the mouse single-cell RNA-seq and TCR-seq processing and downstream analysis. The present repository documents a different analytical layer: **human validation, cross-dataset integration and cancer-cohort analyses**.
+That archive primarily covers mouse single-cell RNA-seq and TCR-seq processing and downstream analysis. This repository documents the human validation, cross-dataset integration and cancer-cohort analyses.
 
 ## Data policy
 
@@ -70,21 +70,13 @@ The complete original working layout is preserved on:
 
 `archive/original-2024`
 
-A pre-curation snapshot of the review branch is also preserved separately.
-
-## Analytical narrative
-
-The computational contribution represented here follows the study from mechanistic mouse findings toward human relevance:
-
-**mouse mechanistic findings → public human datasets → cross-species tissue-resident T-cell signatures → cancer-cohort validation → survival relevance**
-
 ## Citation
 
 If you use analyses from this repository, please cite the associated publication:
 
 > Broquet A, Gourain V, Goronflot T, et al. Sepsis-trained macrophages promote antitumoral tissue-resident T cells. *Nature Immunology*. 2024;25:802–819. https://doi.org/10.1038/s41590-024-01819-8
 
-For the official scRNA-seq/TCR-seq code release, also refer to Victor Gourain's Zenodo archive: https://doi.org/10.5281/zenodo.10715057
+For the official scRNA-seq/TCR-seq code release, see https://doi.org/10.5281/zenodo.10715057
 
 ## Contact
 
