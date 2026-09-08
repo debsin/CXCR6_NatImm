@@ -15,6 +15,21 @@ The analyses here principally correspond to **Figure 8** and **Extended Data Fig
 
 This repository is **complementary** to the study's official scRNA-seq and TCR-seq code archive maintained by Victor Gourain. It does not represent the complete analytical workflow of the collaborative study.
 
+## Curated analysis layout
+
+The public-facing code is organised into five analytical blocks:
+
+```text
+analysis/
+├── 01_bal_covid_validation/
+├── 02_bcg_trained_immunity/
+├── 03_cross_species_trm/
+├── 04_luad_chemokine_correlations/
+└── 05_pan_cancer_survival/
+```
+
+See [`analysis/README.md`](analysis/README.md) for the role and reproducibility status of each block, and [`docs/figure-map.md`](docs/figure-map.md) for the mapping to published panels.
+
 ## Contribution scope
 
 The computational work represented here includes:
@@ -28,8 +43,6 @@ The computational work represented here includes:
 - TCGA cancer analyses linking TRM, macrophage and chemokine signatures;
 - CXCR6–CCR2 coexpression analysis and survival stratification across cancer cohorts.
 
-For a panel-level map, see [`docs/figure-map.md`](docs/figure-map.md).
-
 ## Relationship to the official code archive
 
 The paper's code-availability statement points to the official scRNA-seq/TCR-seq workflow deposited by Victor Gourain:
@@ -41,29 +54,27 @@ That archive primarily covers the mouse single-cell RNA-seq and TCR-seq processi
 
 ## Data policy
 
-No patient-level data, processed RDS objects, TCGA matrices, publisher source-data spreadsheets or controlled-access datasets should be stored in this repository.
+**No study data are stored in this repository.**
 
-The analyses instead rely on public or controlled-access sources documented in [`docs/data-sources.md`](docs/data-sources.md), including GEO, TCGA/UCSC Xena, EGA and the paper's own source-data files.
+The analyses rely on public or controlled-access resources documented in [`docs/data-sources.md`](docs/data-sources.md) and [`data/README.md`](data/README.md), including GEO, TCGA/UCSC Xena, EGA and the paper's source-data files.
+
+Patient-level data, processed RDS objects, TCGA matrices, publisher source-data spreadsheets and controlled-access datasets are intentionally not duplicated here.
 
 ## Reproducibility status
 
-The original 2024 scripts were written as analysis code within an active collaborative project. Several contain absolute local paths, references to objects created in earlier sessions, legacy Seurat slot access or dependencies on datasets that must be obtained separately.
+These scripts originated within an active collaborative analysis environment in 2024. Some contain absolute local paths, references to objects generated in earlier preprocessing steps, legacy package interfaces or dependencies on data that must be obtained separately.
 
-The curated public version should therefore distinguish between:
+Accordingly, this repository should be read as **transparent scientific analysis code**, not a packaged one-command workflow. The curated code preserves the original scientific logic and filenames while making the published analysis path easier to navigate.
 
-- analyses reproducible directly from public data;
-- analyses reproducible after obtaining controlled-access data;
-- documented analysis code preserved for transparency but not yet packaged as a one-command workflow.
-
-The unmodified original repository state is preserved on the branch:
+The complete original working layout is preserved on:
 
 `archive/original-2024`
 
-This branch, `public-review`, is used to prepare a clearer public-facing version without altering the original history.
+A pre-curation snapshot of the review branch is also preserved separately.
 
-## Repository direction
+## Analytical narrative
 
-The goal of the curated version is not to claim ownership of the full study, but to make a specific computational contribution visible and traceable:
+The computational contribution represented here follows the study from mechanistic mouse findings toward human relevance:
 
 **mouse mechanistic findings → public human datasets → cross-species tissue-resident T-cell signatures → cancer-cohort validation → survival relevance**
 
