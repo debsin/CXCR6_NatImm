@@ -31,4 +31,4 @@ Several preserved filenames still refer to `Figure9`. During manuscript developm
 
 ## Attribution note
 
-This mapping identifies where code in this repository supports published panels. It does not imply sole authorship of those panels or of the complete computational workflow. The study was collaborative, and the official mouse scRNA-seq/TCR-seq pipeline is archived separately by Victor Gourain.
+This mapping identifies where code in this repository supports published panels. It does not imply sole authorship of those panels or of the complete computational workflow.
